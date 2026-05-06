@@ -526,7 +526,8 @@ function onCanvasPointer(e) {
     const [sc, sr] = selDot;
     if (sc === col && sr === row) {
       selDot = null;
-    } else if (isAdj(sc, sr, col, row)) {
+    } else {
+      // 距離に関係なく線を引く（隣接制限なし）
       const key = normSeg(sc, sr, col, row);
       const idx = userSegs.findIndex(s => normSeg(...s) === key);
       if (idx >= 0) {
@@ -538,10 +539,6 @@ function onCanvasPointer(e) {
       }
       selDot = null;
       autoCheck();
-    } else {
-      // 隣接でない場合は新しいドットを選択
-      selDot = [col, row];
-      AudioEngine.playSelect();
     }
   }
   render();
