@@ -17,6 +17,14 @@
       text-decoration: none; backdrop-filter: blur(8px);
       display: flex; align-items: center; gap: 4px;
     }
+    .mute-btn {
+      position: fixed; top: env(safe-area-inset-top, 10px); right: 12px;
+      z-index: 999; width: 40px; height: 40px;
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 50%; font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(8px); touch-action: manipulation;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
     :root {
@@ -329,6 +337,7 @@
 
 <!-- メニューへ戻るリンク -->
 <a class="menu-back" href="../index.html">← メニュー</a>
+<button class="mute-btn" id="mute-btn" onclick="toggleMute()">🔊</button>
 
 <!-- TOP SCREEN -->
 <div id="screen-top" class="screen active">
@@ -450,6 +459,91 @@
 <div class="confetti-wrap" id="confetti-wrap"></div>
 
 <script>
+// ── Audio Engine ───────────────────────────────────
+const AudioEngine = (() => {
+  let ctx = null, master = null, muted = false;
+  let bgmOn = false, bgmTimer = null;
+
+  function init() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function note(freq, start, dur, type = 'triangle', vol = 0.3) {
+    const c = init();
+    const osc = c.createOscillator(), g = c.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(vol, start);
+    g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    osc.connect(g); g.connect(master);
+    osc.start(start); osc.stop(start + dur + 0.05);
+  }
+
+  // のどかな子どもむけメロディ（Cメジャーペンタトニック）
+  const MELODY = [
+    [523.25,.25],[659.25,.25],[783.99,.5],[659.25,.25],[523.25,.25],
+    [440,.5],[0,.25],[523.25,.25],[659.25,.25],[783.99,.25],
+    [1046.5,.5],[783.99,.25],[659.25,.25],[523.25,.75],[0,.5],
+    [440,.25],[523.25,.25],[659.25,.5],[523.25,.25],[440,.25],
+    [392,.75],[0,.5],
+  ];
+
+  function scheduleBGM() {
+    if (!bgmOn) return;
+    const c = init(), now = c.currentTime + 0.05;
+    let t = now, total = 0;
+    const beat = 0.42;
+    MELODY.forEach(([f, d]) => {
+      if (f > 0) note(f, t, d * beat * 0.82, 'triangle', 0.1);
+      t += d * beat; total += d * beat;
+    });
+    bgmTimer = setTimeout(scheduleBGM, (total - 0.15) * 1000);
+  }
+
+  return {
+    startBGM() { if (bgmOn) return; bgmOn = true; scheduleBGM(); },
+    stopBGM()  { bgmOn = false; clearTimeout(bgmTimer); },
+
+    playCorrect() {
+      const c = init(), t = c.currentTime;
+      // 上昇アルペジオ ✨
+      [[523.25,0],[659.25,.09],[783.99,.18],[1046.5,.29]].forEach(([f,d]) =>
+        note(f, t+d, 0.38, 'triangle', 0.38));
+    },
+
+    playWrong() {
+      const c = init(), t = c.currentTime;
+      // やさしい「おっと」音
+      note(311.13, t,    0.18, 'triangle', 0.22);
+      note(261.63, t+.2, 0.28, 'triangle', 0.18);
+    },
+
+    playFanfare() {
+      const c = init(), t = c.currentTime;
+      // 大げさなファンファーレ
+      [[523.25,0],[659.25,.12],[783.99,.24],[1046.5,.38],[1318.5,.54]].forEach(([f,d]) =>
+        note(f, t+d, 0.55, 'triangle', 0.42));
+    },
+
+    toggleMute() {
+      muted = !muted;
+      if (master) master.gain.value = muted ? 0 : 1;
+      return muted;
+    },
+  };
+})();
+
+function toggleMute() {
+  const muted = AudioEngine.toggleMute();
+  document.getElementById('mute-btn').textContent = muted ? '🔇' : '🔊';
+}
+
 // ── state ──────────────────────────────────────────
 let selectedGrade = null;
 let selectedMode  = null;
@@ -527,6 +621,7 @@ function startQuiz() {
   streak       = 0;
   maxStreak    = 0;
   startTime    = Date.now();
+  AudioEngine.startBGM();
   showScreen('quiz');
   showQuestion();
 }
@@ -568,6 +663,7 @@ function startTimer() {
 
 function timeUp() {
   answered = true; streak = 0;
+  AudioEngine.playWrong();
   const inp = document.getElementById('answer-input');
   inp.value = '⏰'; inp.className = 'answer-input wrong';
   const fb = document.getElementById('feedback');
@@ -601,6 +697,7 @@ function submitAnswer() {
   const fb = document.getElementById('feedback');
 
   if (correct) {
+    AudioEngine.playCorrect();
     inp.className = 'answer-input correct';
     const bonus = Math.round(pctLeft * 5);
     const pts = 10 + bonus;
@@ -613,6 +710,7 @@ function submitAnswer() {
     showFlash();
     launchConfetti(correctCount % 5 === 0 ? 12 : 4);
   } else {
+    AudioEngine.playWrong();
     inp.className = 'answer-input wrong';
     fb.textContent = `❌ こたえは ${questions[current].answer} だよ！`;
     fb.className = 'feedback wrong';
@@ -628,6 +726,8 @@ function nextQuestion() { current++; showQuestion(); }
 // ── result ─────────────────────────────────────────
 function endQuiz() {
   clearInterval(timerInterval);
+  AudioEngine.stopBGM();
+  if (correctCount === TOTAL) AudioEngine.playFanfare();
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   const pct = Math.round((correctCount / TOTAL) * 100);
 

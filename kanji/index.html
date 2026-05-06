@@ -9,6 +9,15 @@
   <title>かんじモンスター図鑑</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    .mute-btn {
+      position: fixed; top: env(safe-area-inset-top, 10px); right: 12px;
+      z-index: 1000; width: 40px; height: 40px;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 50%; font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(8px); touch-action: manipulation;
+      color: white;
+    }
 
     html, body {
       height: 100%;
@@ -497,6 +506,7 @@
 
 <!-- メニューへ戻るリンク -->
 <a class="menu-back" href="../index.html">← メニュー</a>
+<button class="mute-btn" id="mute-btn" onclick="toggleMute()">🔊</button>
 
 <div id="app">
 
@@ -677,10 +687,93 @@
 </div><!-- #app -->
 
 <script>
+// ── Audio Engine ───────────────────────────────────
+const AudioEngine = (() => {
+  let ctx = null, master = null, muted = false;
+  let bgmOn = false, bgmTimer = null;
+
+  function init() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function note(freq, start, dur, type = 'triangle', vol = 0.3) {
+    const c = init();
+    const osc = c.createOscillator(), g = c.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.setValueAtTime(vol, start);
+    g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    osc.connect(g); g.connect(master);
+    osc.start(start); osc.stop(start + dur + 0.05);
+  }
+
+  // 神秘的な雰囲気のBGM（かんじモンスター向け）
+  const MELODY = [
+    [392,.5],[440,.25],[494,.25],[587,.5],[0,.25],
+    [494,.25],[440,.25],[392,.5],[0,.25],
+    [349,.25],[392,.25],[440,.5],[494,.25],[440,.25],
+    [392,.75],[0,.5],[329,.25],[392,.25],[440,.5],[0,.75],
+  ];
+
+  function scheduleBGM() {
+    if (!bgmOn) return;
+    const c = init(), now = c.currentTime + 0.05;
+    let t = now, total = 0;
+    const beat = 0.5;
+    MELODY.forEach(([f, d]) => {
+      if (f > 0) note(f, t, d * beat * 0.8, 'sine', 0.09);
+      t += d * beat; total += d * beat;
+    });
+    bgmTimer = setTimeout(scheduleBGM, (total - 0.2) * 1000);
+  }
+
+  return {
+    startBGM() { if (bgmOn) return; bgmOn = true; scheduleBGM(); },
+    stopBGM()  { bgmOn = false; clearTimeout(bgmTimer); },
+
+    playCorrect() {
+      const c = init(), t = c.currentTime;
+      [[523.25,0],[659.25,.09],[783.99,.18],[1046.5,.29]].forEach(([f,d]) =>
+        note(f, t+d, 0.38, 'triangle', 0.38));
+    },
+
+    playFanfare() {
+      const c = init(), t = c.currentTime;
+      // モンスター誕生ファンファーレ ✨
+      [[261.63,0],[329.63,.1],[392,.2],[523.25,.32],[659.25,.46],
+       [783.99,.6],[1046.5,.76]].forEach(([f,d]) =>
+        note(f, t+d, 0.6, 'triangle', 0.4));
+      // キラキラ高音
+      setTimeout(() => {
+        const t2 = c.currentTime;
+        [[1318.5,0],[1567.98,.12],[2093,.26]].forEach(([f,d]) =>
+          note(f, t2+d, 0.4, 'sine', 0.25));
+      }, 900);
+    },
+
+    toggleMute() {
+      muted = !muted;
+      if (master) master.gain.value = muted ? 0 : 1;
+      return muted;
+    },
+  };
+})();
+
+function toggleMute() {
+  const muted = AudioEngine.toggleMute();
+  document.getElementById('mute-btn').textContent = muted ? '🔇' : '🔊';
+}
+
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if (id === 'screen-practice') initCanvas();
+  if (id === 'screen-home') AudioEngine.startBGM();
 }
 
 const kanjiData = {
@@ -774,6 +867,8 @@ function showResult() {
   const d = kanjiData[currentKanji] || kanjiData['木'];
   document.getElementById('result-monster').textContent = d.monster;
   document.getElementById('monster-name').textContent = `「${d.name}」`;
+  AudioEngine.stopBGM();
+  AudioEngine.playFanfare();
   showScreen('screen-result-k');
   createParticles();
   if ('speechSynthesis' in window) {
