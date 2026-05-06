@@ -152,6 +152,18 @@
     }
     .card-sansuu .card-icon { background: rgba(255,255,255,0.2); }
     .card-kanji  .card-icon { background: rgba(255,215,0,0.15); }
+    .card-taisho .card-icon { background: rgba(255,255,255,0.2); }
+
+    /* たいしょうパズル */
+    .card-taisho {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    .card-taisho::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 60%);
+    }
+    .card-taisho .card-tag { color: rgba(255,255,255,0.75); }
 
     .card-text { flex: 1; }
     .card-tag {
@@ -255,10 +267,23 @@
       <div class="new-badge">NEW</div>
     </a>
 
+    <a class="game-card card-taisho" href="taisho/index.html">
+      <div class="card-inner">
+        <div class="card-icon">🪞</div>
+        <div class="card-text">
+          <div class="card-tag">PUZZLE</div>
+          <div class="card-title">たいしょう<br>パズル</div>
+          <div class="card-desc">かがみのように せんをひいて<br>ずけいをかんせいさせよう！</div>
+        </div>
+        <div class="card-arrow">▶</div>
+      </div>
+      <div class="new-badge">NEW</div>
+    </a>
+
   </div>
 
   <div class="footer">
-    <p>🎮 2つのゲームで楽しく学ぼう！</p>
+    <p>🎮 3つのゲームで楽しく学ぼう！</p>
   </div>
 </div>
 

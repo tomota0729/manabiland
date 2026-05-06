@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a3d2e">
+  <title>たいしょうパズル</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      height: 100%; overflow: hidden; overscroll-behavior: none;
+    }
+    body {
+      font-family: 'Hiragino Maru Gothic Pro', 'BIZ UDPGothic', Meiryo, sans-serif;
+      background: linear-gradient(160deg, #0a3d2e 0%, #155740 50%, #0a3028 100%);
+      display: flex; flex-direction: column; align-items: center;
+      min-height: 100vh; min-height: -webkit-fill-available;
+      padding: env(safe-area-inset-top,0) env(safe-area-inset-right,0)
+               env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+    }
+
+    /* ── 固定ボタン ── */
+    .menu-back {
+      position: fixed; top: max(env(safe-area-inset-top,0px),10px); left: 12px;
+      z-index: 999;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+      color: #fff; font-size: 13px; font-weight: 700;
+      padding: 6px 12px; border-radius: 20px;
+      text-decoration: none; backdrop-filter: blur(8px);
+      display: flex; align-items: center; gap: 4px;
+    }
+    .mute-btn {
+      position: fixed; top: max(env(safe-area-inset-top,0px),10px); right: 12px;
+      z-index: 999; width: 40px; height: 40px;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 50%; font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(8px); touch-action: manipulation; color: white;
+    }
+
+    /* ── 画面共通 ── */
+    .screen { display: none; width: 100%; max-width: 480px; flex-direction: column; align-items: center; flex: 1; }
+    .screen.active { display: flex; }
+
+    /* ===== レベル選択 ===== */
+    #screen-level {
+      padding-top: max(env(safe-area-inset-top,0px), 60px);
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding-bottom: 20px;
+    }
+    .level-header { text-align: center; padding: 0 20px 20px; }
+    .level-header .logo { font-size: clamp(44px,12vw,60px); margin-bottom: 4px; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+    .level-header h1 { font-size: clamp(22px,7vw,30px); font-weight:900; color:#fff; margin-bottom:4px; }
+    .level-header p  { font-size: clamp(12px,3.5vw,15px); color:rgba(255,255,255,.6); }
+
+    .level-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: clamp(10px,3vw,14px);
+      padding: 0 clamp(12px,4vw,20px) 20px; width: 100%;
+    }
+    .level-card {
+      background: #fff; border-radius: clamp(14px,4vw,20px);
+      padding: clamp(10px,3vw,14px); display: flex; flex-direction: column;
+      align-items: center; gap: 6px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+      cursor: pointer; transition: transform .15s;
+      touch-action: manipulation; position: relative;
+    }
+    .level-card:active { transform: scale(0.95); }
+    .level-card.cleared { border: 2.5px solid #4ade80; }
+    .preview-canvas { border-radius: 8px; display: block; }
+    .level-card-num {
+      font-size: clamp(10px,3vw,12px); font-weight:800;
+      color: #fff; background: #155740;
+      border-radius: 20px; padding: 2px 10px;
+    }
+    .level-card-name { font-size: clamp(12px,3.5vw,14px); font-weight:800; color:#333; text-align:center; }
+    .level-cleared-badge {
+      position:absolute; top:-6px; right:-6px;
+      background:#4ade80; color:#fff; border-radius:50%;
+      width:22px; height:22px; display:none;
+      align-items:center; justify-content:center; font-size:13px;
+    }
+    .level-card.cleared .level-cleared-badge { display:flex; }
+
+    /* ===== ゲーム画面 ===== */
+    #screen-game {
+      padding-top: max(env(safe-area-inset-top,0px), 58px);
+      justify-content: flex-start;
+      gap: 8px;
+    }
+    .game-topbar {
+      width: 100%; display: flex; align-items: center; gap: 10px;
+      padding: 0 16px; height: 44px;
+    }
+    .game-back {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+      color: #fff; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation;
+    }
+    .game-level-name { flex:1; font-size:clamp(14px,4vw,18px); font-weight:800; color:#fff; text-align:center; }
+    .game-level-num  { font-size:clamp(12px,3.5vw,15px); color:rgba(255,255,255,.6); font-weight:700; }
+
+    .hint-text {
+      font-size: clamp(12px,3.5vw,15px); color: rgba(255,255,255,.75);
+      background: rgba(255,255,255,0.1); border-radius: 20px;
+      padding: 5px 16px; text-align: center;
+    }
+
+    .canvas-wrap {
+      position: relative; flex-shrink: 0;
+    }
+    #game-canvas {
+      display: block; border-radius: clamp(14px,4vw,20px);
+      background: #f8f5ff;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      touch-action: none;
+    }
+
+    .legend {
+      display: flex; gap: 16px; align-items: center;
+    }
+    .legend-item { display:flex; align-items:center; gap:5px; font-size:clamp(11px,3vw,13px); color:rgba(255,255,255,.8); }
+    .legend-dot { width:16px; height:3.5px; border-radius:2px; }
+    .legend-dot.tmpl { background:#7c5cbf; }
+    .legend-dot.user { background:#ff7043; }
+
+    .action-row { display:flex; gap:12px; width:100%; padding:0 16px; }
+    .btn-clear {
+      flex:0 0 56px; height:52px; border-radius:14px;
+      background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3);
+      color:#fff; font-size:20px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      touch-action:manipulation;
+    }
+    .btn-clear:active { transform:scale(.95); }
+    .btn-check {
+      flex:1; height:52px; border-radius:14px;
+      background:linear-gradient(135deg,#27ae60,#2ecc71);
+      border:none; color:#fff;
+      font-size:clamp(15px,4.5vw,18px); font-weight:800;
+      cursor:pointer; box-shadow:0 6px 20px rgba(46,204,113,0.4);
+      touch-action:manipulation;
+    }
+    .btn-check:active { transform:scale(.97); }
+
+    /* ===== クリア画面 ===== */
+    #screen-clear {
+      justify-content: center;
+      padding: 20px 20px max(env(safe-area-inset-bottom,0px),20px);
+    }
+    .clear-card {
+      background: #fff; border-radius: clamp(20px,5vw,28px);
+      padding: clamp(24px,6vw,36px) clamp(20px,5vw,32px);
+      text-align: center; width: 100%;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+    }
+    .clear-emoji { font-size: clamp(56px,16vw,72px); margin-bottom:8px; animation: pop .5s cubic-bezier(.175,.885,.32,1.275); }
+    @keyframes pop { 0%{transform:scale(0)} 100%{transform:scale(1)} }
+    .clear-title { font-size:clamp(26px,8vw,34px); font-weight:900; color:#155740; margin-bottom:4px; }
+    .clear-sub   { font-size:clamp(13px,3.5vw,16px); color:#888; margin-bottom:6px; }
+    .clear-level { font-size:clamp(15px,4.5vw,18px); font-weight:800; color:#7c5cbf; margin-bottom:20px; }
+    .clear-stars { font-size:clamp(30px,9vw,40px); margin-bottom:20px; }
+
+    .clear-btns { display:flex; flex-direction:column; gap:10px; }
+    .btn-next {
+      padding:clamp(14px,4vw,18px); border-radius:clamp(14px,4vw,20px);
+      border:none; background:linear-gradient(135deg,#27ae60,#2ecc71);
+      color:#fff; font-size:clamp(16px,4.5vw,20px); font-weight:900;
+      cursor:pointer; box-shadow:0 6px 20px rgba(46,204,113,.4);
+      touch-action:manipulation;
+    }
+    .btn-next:active { transform:scale(.97); }
+    .btn-retry {
+      padding:clamp(12px,3.5vw,16px); border-radius:clamp(14px,4vw,20px);
+      border:none; background:rgba(21,87,64,0.1);
+      color:#155740; font-size:clamp(14px,4vw,17px); font-weight:700;
+      cursor:pointer; touch-action:manipulation;
+    }
+    .btn-home {
+      padding:clamp(11px,3vw,14px); border-radius:clamp(14px,4vw,20px);
+      border:2px solid #ddd; background:#fff; color:#888;
+      font-size:clamp(13px,3.5vw,16px); font-weight:700;
+      cursor:pointer; touch-action:manipulation;
+    }
+
+    /* ── confetti ── */
+    .confetti-wrap { position:fixed; inset:0; pointer-events:none; z-index:998; overflow:hidden; }
+    .confetti-piece { position:absolute; border-radius:2px; animation:fall linear forwards; }
+    @keyframes fall { 0%{transform:translateY(-20px) rotate(0);opacity:1} 100%{transform:translateY(110vh) rotate(720deg);opacity:0} }
+
+    /* ── エラーフラッシュ ── */
+    .err-flash { animation: errShake 0.4s ease; }
+    @keyframes errShake {
+      0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
+    }
+  </style>
+</head>
+<body>
+
+<a class="menu-back" href="../index.html">← メニュー</a>
+<button class="mute-btn" id="mute-btn" onclick="toggleMute()">🔊</button>
+
+<!-- ===== レベル選択 ===== -->
+<div id="screen-level" class="screen active">
+  <div class="level-header">
+    <div class="logo">🪞</div>
+    <h1>たいしょうパズル</h1>
+    <p>かがみのように せんをひいてね！</p>
+  </div>
+  <div class="level-grid" id="level-grid"></div>
+</div>
+
+<!-- ===== ゲーム画面 ===== -->
+<div id="screen-game" class="screen">
+  <div class="game-topbar">
+    <button class="game-back" onclick="showScreen('level')">←</button>
+    <div class="game-level-name" id="game-level-name">Lじのかたち</div>
+    <div class="game-level-num" id="game-level-num">Lv.1</div>
+  </div>
+  <div class="hint-text" id="hint-text">💡 のこりの3かしょに かがみのように せんをひいてね</div>
+  <div class="canvas-wrap">
+    <canvas id="game-canvas"></canvas>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot tmpl"></div>おてほん</div>
+    <div class="legend-item"><div class="legend-dot user"></div>きみがひく</div>
+  </div>
+  <div class="action-row">
+    <button class="btn-clear" onclick="clearUserLines()" title="けす">🗑️</button>
+    <button class="btn-check" onclick="checkAnswer()">こたえあわせ ✓</button>
+  </div>
+</div>
+
+<!-- ===== クリア画面 ===== -->
+<div id="screen-clear" class="screen">
+  <div class="clear-card">
+    <div class="clear-emoji">🎉</div>
+    <div class="clear-title">せいかい！</div>
+    <div class="clear-sub">たいしょうに なってるよ！</div>
+    <div class="clear-level" id="clear-level-name">Lじのかたち</div>
+    <div class="clear-stars">⭐⭐⭐</div>
+    <div class="clear-btns">
+      <button class="btn-next" id="btn-next" onclick="nextLevel()">つぎのレベルへ ▶</button>
+      <button class="btn-retry" onclick="retryLevel()">もういちど 🔄</button>
+      <button class="btn-home"  onclick="showScreen('level')">レベルえらび 🏠</button>
+    </div>
+  </div>
+</div>
+
+<div class="confetti-wrap" id="confetti-wrap"></div>
+
+<script>
+// ── Audio Engine ────────────────────────────────────
+const AudioEngine = (() => {
+  let ctx = null, master = null, muted = false;
+  let bgmOn = false, bgmTimer = null;
+
+  function init() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function note(freq, start, dur, type = 'triangle', vol = 0.3) {
+    const c = init();
+    const osc = c.createOscillator(), g = c.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.setValueAtTime(vol, start);
+    g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    osc.connect(g); g.connect(master);
+    osc.start(start); osc.stop(start + dur + 0.05);
+  }
+
+  // 落ち着いた知的なBGM（パズル向け）
+  const MELODY = [
+    [523.25,.5],[659.25,.5],[783.99,.5],[0,.5],
+    [659.25,.5],[523.25,.5],[392,.75],[0,.75],
+    [440,.5],[523.25,.5],[659.25,.5],[0,.5],
+    [783.99,.5],[659.25,.5],[523.25,1],[0,1],
+  ];
+
+  function scheduleBGM() {
+    if (!bgmOn) return;
+    const c = init(), now = c.currentTime + 0.05;
+    let t = now, total = 0;
+    const beat = 0.55;
+    MELODY.forEach(([f, d]) => {
+      if (f > 0) note(f, t, d * beat * 0.78, 'triangle', 0.09);
+      t += d * beat; total += d * beat;
+    });
+    bgmTimer = setTimeout(scheduleBGM, (total - 0.2) * 1000);
+  }
+
+  return {
+    startBGM() { if (bgmOn) return; bgmOn = true; scheduleBGM(); },
+    stopBGM()  { bgmOn = false; clearTimeout(bgmTimer); },
+
+    playSelect() {
+      const c = init(), t = c.currentTime;
+      note(880, t, 0.08, 'sine', 0.14);
+    },
+    playDraw() {
+      const c = init(), t = c.currentTime;
+      note(660, t,      0.07, 'triangle', 0.18);
+      note(880, t+0.07, 0.1,  'triangle', 0.13);
+    },
+    playErase() {
+      const c = init(), t = c.currentTime;
+      note(523, t,      0.07, 'triangle', 0.15);
+      note(392, t+0.07, 0.1,  'triangle', 0.11);
+    },
+    playWrong() {
+      const c = init(), t = c.currentTime;
+      note(311, t,    0.2, 'triangle', 0.2);
+      note(262, t+.22,0.3, 'triangle', 0.16);
+    },
+    playCorrect() {
+      const c = init(), t = c.currentTime;
+      [[523.25,0],[659.25,.1],[783.99,.2],[1046.5,.32]].forEach(([f,d]) =>
+        note(f, t+d, 0.38, 'triangle', 0.38));
+    },
+    playFanfare() {
+      const c = init(), t = c.currentTime;
+      [[523.25,0],[659.25,.12],[783.99,.24],[1046.5,.38],[1318.5,.54]].forEach(([f,d]) =>
+        note(f, t+d, 0.55, 'triangle', 0.42));
+    },
+    toggleMute() {
+      muted = !muted;
+      if (master) master.gain.value = muted ? 0 : 1;
+      return muted;
+    },
+  };
+})();
+
+function toggleMute() {
+  const m = AudioEngine.toggleMute();
+  document.getElementById('mute-btn').textContent = m ? '🔇' : '🔊';
+}
+
+// ── Grid constants ──────────────────────────────────
+const GRID = 12;   // dots per side (0..11)
+const MAX  = 11;   // GRID - 1
+let CSS_SIZE = 0, CELL = 0, PAD = 0;
+let gameCtx = null;
+
+function dotX(col) { return PAD + col * CELL; }
+function dotY(row) { return PAD + row * CELL; }
+
+// ── Level data ──────────────────────────────────────
+// Segments are in the top-left quadrant (col:0-5, row:0-5)
+const levels = [
+  { id:1, name:'Lじのかたち',    hint:'まっすぐな せんを2ほん！',
+    segments:[[1,1,5,1],[1,1,1,5]] },
+  { id:2, name:'ななめのせん',   hint:'ななめのせんに ちょうせん！',
+    segments:[[1,1,5,5],[1,4,4,1]] },
+  { id:3, name:'さんかく',       hint:'さんかくのかたちを つくろう！',
+    segments:[[1,1,5,1],[1,1,1,5],[1,5,5,1]] },
+  { id:4, name:'しかく',         hint:'しかくを よっかしょ かこう！',
+    segments:[[1,1,4,1],[1,1,1,4],[4,1,4,4],[1,4,4,4]] },
+  { id:5, name:'やじるし',       hint:'やじるしのかたちだよ！',
+    segments:[[1,3,5,3],[3,1,5,3],[3,5,5,3]] },
+  { id:6, name:'いなずま',       hint:'ジグザグ！がんばれ！',
+    segments:[[2,1,5,1],[2,1,1,4],[1,4,4,4],[4,4,3,5]] },
+  { id:7, name:'おうちのかたち', hint:'おうちを かいてみよう！',
+    segments:[[1,3,5,3],[1,3,3,1],[3,1,5,3],[1,3,1,5],[1,5,5,5]] },
+  { id:8, name:'ほしのかたち',   hint:'むずかしいよ！きみならできる！',
+    segments:[[2,1,5,4],[2,1,1,4],[1,2,5,2],[3,5,5,2],[3,5,1,2]] },
+];
+
+// ── State ───────────────────────────────────────────
+let currentLevel = 0;
+let selDot = null;     // [col, row] | null
+let userSegs = [];     // [[c1,r1,c2,r2], ...]
+let clearedLevels = {};
+
+// ── Geometry helpers ────────────────────────────────
+function normSeg(c1, r1, c2, r2) {
+  if (c1 > c2 || (c1 === c2 && r1 > r2)) { [c1,c2]=[c2,c1]; [r1,r2]=[r2,r1]; }
+  return `${c1},${r1}-${c2},${r2}`;
+}
+
+function isAdj(c1, r1, c2, r2) {
+  const dc = Math.abs(c1-c2), dr = Math.abs(r1-r2);
+  return dc <= 1 && dr <= 1 && dc + dr > 0;
+}
+
+function isTemplateZone(col, row) {
+  return col <= 5 && row <= 5;
+}
+
+function getRequired(segs) {
+  const set = new Set();
+  segs.forEach(([c1,r1,c2,r2]) => {
+    set.add(normSeg(MAX-c1,    r1, MAX-c2,    r2));  // 左右ミラー
+    set.add(normSeg(c1,    MAX-r1, c2,    MAX-r2));  // 上下ミラー
+    set.add(normSeg(MAX-c1,MAX-r1, MAX-c2,MAX-r2));  // 点対称
+  });
+  return set;
+}
+
+// ── Canvas setup ────────────────────────────────────
+function initCanvas() {
+  const canvas = document.getElementById('game-canvas');
+  const dpr = window.devicePixelRatio || 1;
+  const maxW = window.innerWidth - 32;
+  const maxH = window.innerHeight - 240;
+  CSS_SIZE = Math.min(maxW, maxH, 360);
+
+  canvas.style.width  = CSS_SIZE + 'px';
+  canvas.style.height = CSS_SIZE + 'px';
+  canvas.width  = Math.round(CSS_SIZE * dpr);
+  canvas.height = Math.round(CSS_SIZE * dpr);
+
+  gameCtx = canvas.getContext('2d');
+  gameCtx.scale(dpr, dpr);
+
+  PAD  = 14;
+  CELL = (CSS_SIZE - PAD * 2) / (GRID - 1);
+
+  // イベント登録（重複防止のため毎回再設定）
+  canvas.onpointerdown = onCanvasPointer;
+  canvas.onclick = null;
+}
+
+// ── Render ──────────────────────────────────────────
+function render() {
+  if (!gameCtx) return;
+  const ctx = gameCtx;
+  ctx.clearRect(0, 0, CSS_SIZE, CSS_SIZE);
+
+  // お手本ゾーン（左上）背景
+  const axX = (dotX(5) + dotX(6)) / 2;
+  const axY = (dotY(5) + dotY(6)) / 2;
+  ctx.fillStyle = 'rgba(124,92,191,0.07)';
+  ctx.fillRect(0, 0, axX, axY);
+
+  // 「おてほん」ラベル
+  ctx.fillStyle = 'rgba(124,92,191,0.45)';
+  ctx.font = `bold ${Math.round(CELL * 0.55)}px sans-serif`;
+  ctx.fillText('おてほん', PAD + 2, PAD + CELL * 0.65);
+
+  // 対称軸（点線）
+  ctx.save();
+  ctx.setLineDash([Math.round(CELL*0.25), Math.round(CELL*0.18)]);
+  ctx.strokeStyle = 'rgba(124,92,191,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(axX, 0); ctx.lineTo(axX, CSS_SIZE); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, axY); ctx.lineTo(CSS_SIZE, axY); ctx.stroke();
+  ctx.restore();
+
+  // お手本線（青紫）
+  drawLines(ctx, levels[currentLevel].segments, '#7c5cbf', 3.5);
+
+  // ユーザー線（オレンジ）
+  drawLines(ctx, userSegs, '#ff7043', 3.5);
+
+  // ドット
+  drawDots(ctx, axX, axY);
+
+  // 選択中ドット
+  if (selDot) {
+    const [col, row] = selDot;
+    ctx.beginPath();
+    ctx.arc(dotX(col), dotY(row), CELL * 0.28, 0, Math.PI * 2);
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(dotX(col), dotY(row), CELL * 0.12, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd700';
+    ctx.fill();
+  }
+}
+
+function drawLines(ctx, segs, color, width) {
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
+  segs.forEach(([c1,r1,c2,r2]) => {
+    ctx.beginPath();
+    ctx.moveTo(dotX(c1), dotY(r1));
+    ctx.lineTo(dotX(c2), dotY(r2));
+    ctx.stroke();
+  });
+}
+
+function drawDots(ctx, axX, axY) {
+  const r = Math.max(3, CELL * 0.13);
+  for (let row = 0; row < GRID; row++) {
+    for (let col = 0; col < GRID; col++) {
+      ctx.beginPath();
+      ctx.arc(dotX(col), dotY(row), r, 0, Math.PI * 2);
+      ctx.fillStyle = isTemplateZone(col, row) ? '#5a3d8c' : '#8080b0';
+      ctx.fill();
+    }
+  }
+}
+
+// ── Touch input ─────────────────────────────────────
+function onCanvasPointer(e) {
+  e.preventDefault();
+  const canvas = document.getElementById('game-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * (CSS_SIZE / rect.width);
+  const py = (e.clientY - rect.top)  * (CSS_SIZE / rect.height);
+
+  const dot = snapToDot(px, py);
+  if (!dot) { selDot = null; render(); return; }
+  const [col, row] = dot;
+
+  if (isTemplateZone(col, row)) return; // お手本ゾーンはタップ不可
+
+  if (!selDot) {
+    selDot = [col, row];
+    AudioEngine.playSelect();
+  } else {
+    const [sc, sr] = selDot;
+    if (sc === col && sr === row) {
+      selDot = null;
+    } else if (isAdj(sc, sr, col, row)) {
+      const key = normSeg(sc, sr, col, row);
+      const idx = userSegs.findIndex(s => normSeg(...s) === key);
+      if (idx >= 0) {
+        userSegs.splice(idx, 1);
+        AudioEngine.playErase();
+      } else {
+        userSegs.push([sc, sr, col, row]);
+        AudioEngine.playDraw();
+      }
+      selDot = null;
+      autoCheck();
+    } else {
+      // 隣接でない場合は新しいドットを選択
+      selDot = [col, row];
+      AudioEngine.playSelect();
+    }
+  }
+  render();
+}
+
+function snapToDot(px, py) {
+  const SNAP = CELL * 0.52;
+  let best = null, bestD = Infinity;
+  for (let r = 0; r < GRID; r++) {
+    for (let c = 0; c < GRID; c++) {
+      const d = Math.hypot(px - dotX(c), py - dotY(r));
+      if (d < SNAP && d < bestD) { bestD = d; best = [c, r]; }
+    }
+  }
+  return best;
+}
+
+// ── Symmetry check ──────────────────────────────────
+function autoCheck() {
+  const required = getRequired(levels[currentLevel].segments);
+  if (userSegs.length !== required.size) return;
+  if (checkSymmetry(required)) onClear();
+}
+
+function checkAnswer() {
+  const required = getRequired(levels[currentLevel].segments);
+  if (checkSymmetry(required)) {
+    onClear();
+  } else {
+    AudioEngine.playWrong();
+    const canvas = document.getElementById('game-canvas');
+    canvas.classList.add('err-flash');
+    setTimeout(() => canvas.classList.remove('err-flash'), 500);
+  }
+}
+
+function checkSymmetry(required) {
+  if (!required) required = getRequired(levels[currentLevel].segments);
+  if (userSegs.length !== required.size) return false;
+  const userSet = new Set(userSegs.map(s => normSeg(...s)));
+  for (const seg of required) {
+    if (!userSet.has(seg)) return false;
+  }
+  return true;
+}
+
+// ── Game flow ────────────────────────────────────────
+function startLevel(idx) {
+  currentLevel = idx;
+  userSegs = [];
+  selDot = null;
+  document.getElementById('game-level-name').textContent = levels[idx].name;
+  document.getElementById('game-level-num').textContent  = `Lv.${idx + 1}`;
+  document.getElementById('hint-text').textContent       = `💡 ${levels[idx].hint}`;
+  showScreen('game');
+  initCanvas();
+  render();
+  AudioEngine.startBGM();
+}
+
+function onClear() {
+  AudioEngine.stopBGM();
+  AudioEngine.playFanfare();
+
+  // 正解時、全線を緑にフラッシュ
+  renderClearEffect();
+
+  // クリア記録
+  clearedLevels[currentLevel] = true;
+  try { localStorage.setItem('taishoCleared', JSON.stringify(clearedLevels)); } catch(e) {}
+
+  launchConfetti(28);
+
+  const isLast = currentLevel >= levels.length - 1;
+  document.getElementById('clear-level-name').textContent = levels[currentLevel].name;
+  document.getElementById('btn-next').style.display = isLast ? 'none' : '';
+
+  setTimeout(() => showScreen('clear'), 900);
+}
+
+function renderClearEffect() {
+  if (!gameCtx) return;
+  const ctx = gameCtx;
+  // ユーザー線をすべて緑で再描画
+  drawLines(ctx, userSegs, '#27ae60', 4);
+  // お手本も緑
+  drawLines(ctx, levels[currentLevel].segments, '#27ae60', 4);
+  drawDots(ctx, 0, 0);
+}
+
+function clearUserLines() {
+  userSegs = []; selDot = null; render();
+}
+
+function nextLevel() {
+  if (currentLevel < levels.length - 1) startLevel(currentLevel + 1);
+  else showScreen('level');
+}
+
+function retryLevel() { startLevel(currentLevel); }
+
+// ── Screen switching ────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(`screen-${name}`).classList.add('active');
+  if (name === 'level') {
+    AudioEngine.stopBGM();
+    buildLevelCards();
+  }
+}
+
+// ── Level card builder ──────────────────────────────
+function buildLevelCards() {
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  levels.forEach((lv, idx) => {
+    const card = document.createElement('div');
+    card.className = 'level-card' + (clearedLevels[idx] ? ' cleared' : '');
+    card.onclick = () => startLevel(idx);
+
+    const badge = document.createElement('div');
+    badge.className = 'level-cleared-badge';
+    badge.textContent = '✓';
+    card.appendChild(badge);
+
+    // プレビューcanvas
+    const previewSize = Math.min(Math.floor((window.innerWidth - 80) / 2), 110);
+    const pc = document.createElement('canvas');
+    pc.className = 'preview-canvas';
+    pc.width  = previewSize;
+    pc.height = previewSize;
+    pc.style.width  = previewSize + 'px';
+    pc.style.height = previewSize + 'px';
+    card.appendChild(pc);
+
+    const numEl = document.createElement('div');
+    numEl.className = 'level-card-num';
+    numEl.textContent = `Lv. ${idx + 1}`;
+    card.appendChild(numEl);
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'level-card-name';
+    nameEl.textContent = lv.name;
+    card.appendChild(nameEl);
+
+    grid.appendChild(card);
+    renderPreview(pc, previewSize, lv.segments);
+  });
+}
+
+function renderPreview(canvas, size, segs) {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = size * dpr;
+  canvas.height = size * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad  = 5;
+  const cell = (size - pad * 2) / (GRID - 1);
+  const dx = c => pad + c * cell;
+  const dy = r => pad + r * cell;
+
+  // 軸線（点線）
+  const axX = (dx(5) + dx(6)) / 2;
+  const axY = (dy(5) + dy(6)) / 2;
+  ctx.save();
+  ctx.setLineDash([3, 2]);
+  ctx.strokeStyle = 'rgba(124,92,191,0.3)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.moveTo(axX,0); ctx.lineTo(axX,size); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,axY); ctx.lineTo(size,axY); ctx.stroke();
+  ctx.restore();
+
+  // 完成形（4象限すべて）
+  const drawPreviewLines = (segList, color, w) => {
+    ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+    segList.forEach(([c1,r1,c2,r2]) => {
+      ctx.beginPath(); ctx.moveTo(dx(c1),dy(r1)); ctx.lineTo(dx(c2),dy(r2)); ctx.stroke();
+    });
+  };
+
+  const allSegs = [...segs];
+  segs.forEach(([c1,r1,c2,r2]) => {
+    allSegs.push([MAX-c1,r1,   MAX-c2,r2]);
+    allSegs.push([c1,   MAX-r1,c2,   MAX-r2]);
+    allSegs.push([MAX-c1,MAX-r1,MAX-c2,MAX-r2]);
+  });
+
+  drawPreviewLines(segs,    '#7c5cbf', Math.max(1.5, cell * 0.12));
+  drawPreviewLines(allSegs.slice(segs.length), 'rgba(255,112,67,0.5)', Math.max(1, cell * 0.1));
+
+  // ドット
+  for (let r = 0; r < GRID; r++) {
+    for (let c = 0; c < GRID; c++) {
+      const dr = Math.max(1.5, cell * 0.1);
+      ctx.beginPath();
+      ctx.arc(dx(c), dy(r), dr, 0, Math.PI * 2);
+      ctx.fillStyle = (c <= 5 && r <= 5) ? '#5a3d8c' : '#9090b8';
+      ctx.fill();
+    }
+  }
+}
+
+// ── Confetti ────────────────────────────────────────
+function launchConfetti(count) {
+  const wrap = document.getElementById('confetti-wrap');
+  const cols = ['#27ae60','#f093fb','#56ccf2','#ffe74c','#e04fc0','#667eea','#ff9a00'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.cssText = `
+      left:${Math.random()*100}%;
+      background:${cols[Math.floor(Math.random()*cols.length)]};
+      animation-duration:${1.2+Math.random()*2}s;
+      animation-delay:${Math.random()*0.5}s;
+      width:${8+Math.random()*9}px; height:${8+Math.random()*9}px;
+    `;
+    wrap.appendChild(p);
+    setTimeout(() => p.remove(), 3500);
+  }
+}
+
+// ── Init ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  try { clearedLevels = JSON.parse(localStorage.getItem('taishoCleared') || '{}'); } catch(e) {}
+  buildLevelCards();
+});
+
+document.body.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+</script>
+</body>
+</html>
