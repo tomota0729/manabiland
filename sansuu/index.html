@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#5c35b0">
+  <title>さんすうチャレンジ！</title>
+  <style>
+    .menu-back {
+      position: fixed; top: env(safe-area-inset-top, 10px); left: 12px;
+      z-index: 999;
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35);
+      color: #fff; font-size: 13px; font-weight: 700;
+      padding: 6px 12px; border-radius: 20px;
+      text-decoration: none; backdrop-filter: blur(8px);
+      display: flex; align-items: center; gap: 4px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --purple: #5c35b0;
+      --pink:   #f5576c;
+      --grad:   linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+
+    body {
+      font-family: 'Hiragino Maru Gothic Pro', 'BIZ UDPGothic', Meiryo, Rounded Mplus 1c, sans-serif;
+      background: var(--grad);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 16px)
+               env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 16px);
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+
+    /* ── scroll wrapper for top/result screens ── */
+    .scroll-wrap {
+      width: 100%;
+      max-width: 520px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 16px;
+      padding-bottom: 16px;
+    }
+
+    .screen { display: none; width: 100%; flex-direction: column; align-items: center; }
+    .screen.active { display: flex; }
+
+    /* ── card base ── */
+    .card {
+      background: white;
+      border-radius: clamp(20px, 5vw, 28px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.22);
+      width: 100%;
+    }
+
+    /* ===== TOP SCREEN ===== */
+    #screen-top {
+      flex: 1;
+      justify-content: flex-start;
+    }
+    .top-scroll {
+      width: 100%;
+      max-width: 520px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+      padding: 16px 0;
+    }
+
+    .title-card {
+      padding: clamp(20px, 5vw, 36px) clamp(16px, 5vw, 32px);
+      text-align: center;
+    }
+
+    .title-emoji { font-size: clamp(48px, 12vw, 72px); margin-bottom: 4px; animation: bounce 1.5s infinite; }
+    @keyframes bounce {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-10px); }
+    }
+
+    .title-text { font-size: clamp(26px, 8vw, 40px); font-weight: bold; color: var(--purple); }
+    .title-sub  { font-size: clamp(13px, 3.5vw, 16px); color: #888; margin-bottom: clamp(20px, 5vw, 32px); }
+
+    .section-label {
+      font-size: clamp(14px, 3.8vw, 18px);
+      font-weight: bold;
+      color: #555;
+      margin-bottom: 10px;
+    }
+
+    /* grade buttons */
+    .grade-btns { display: flex; gap: clamp(8px, 2vw, 14px); margin-bottom: clamp(16px, 4vw, 24px); justify-content: center; }
+    .grade-btn {
+      width: clamp(72px, 22vw, 96px);
+      height: clamp(72px, 22vw, 96px);
+      border-radius: clamp(14px, 4vw, 22px);
+      border: 3px solid #ddd;
+      background: #f5f5f5;
+      font-size: clamp(12px, 3vw, 15px);
+      font-weight: bold; color: #555;
+      cursor: pointer; transition: all .18s;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    }
+    .grade-btn .gn { font-size: clamp(26px, 8vw, 34px); line-height: 1; }
+    .grade-btn.selected { border-color: var(--purple); background: var(--purple); color: white; }
+    .grade-btn:active { transform: scale(0.94); }
+
+    /* mode buttons */
+    .mode-btns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(8px, 2vw, 12px);
+      margin-bottom: clamp(20px, 5vw, 28px);
+      width: 100%;
+    }
+    .mode-btn {
+      padding: clamp(12px, 3vw, 18px) 8px;
+      border-radius: clamp(12px, 4vw, 18px);
+      border: 3px solid #ddd;
+      background: #f5f5f5;
+      font-size: clamp(14px, 3.5vw, 16px);
+      font-weight: bold; color: #555;
+      cursor: pointer; transition: all .18s; text-align: center;
+    }
+    .mode-btn .mi { font-size: clamp(22px, 6vw, 28px); display: block; margin-bottom: 4px; }
+    .mode-btn.selected { border-color: #e04fc0; background: #e04fc0; color: white; }
+    .mode-btn:active { transform: scale(0.96); }
+
+    .start-btn {
+      width: 100%; padding: clamp(14px, 4vw, 20px);
+      border-radius: clamp(14px, 4vw, 22px);
+      border: none;
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+      color: white; font-size: clamp(18px, 5vw, 24px); font-weight: bold;
+      cursor: pointer; transition: all .2s;
+      box-shadow: 0 6px 20px rgba(240,93,251,0.4);
+      touch-action: manipulation;
+    }
+    .start-btn:active { transform: scale(0.97); }
+    .start-btn:disabled { background: #ccc; box-shadow: none; opacity: 0.6; }
+
+    /* ===== QUIZ SCREEN ===== */
+    #screen-quiz {
+      flex: 1;
+      width: 100%;
+      max-width: 520px;
+      padding-top: 12px;
+    }
+
+    .quiz-header {
+      display: flex; justify-content: space-between; align-items: center;
+      width: 100%; margin-bottom: 8px;
+      padding: 0 4px;
+    }
+    .progress-info { color: white; font-size: clamp(13px, 3.5vw, 16px); font-weight: bold; }
+    .score-badge {
+      background: rgba(255,255,255,0.25); color: white;
+      padding: 5px 14px; border-radius: 20px;
+      font-size: clamp(13px, 3.5vw, 16px); font-weight: bold;
+    }
+
+    .progress-bar-wrap {
+      width: 100%; height: 8px;
+      background: rgba(255,255,255,0.3); border-radius: 8px;
+      margin-bottom: 10px; overflow: hidden;
+    }
+    .progress-bar { height: 100%; background: #ffe74c; border-radius: 8px; transition: width .4s ease; }
+
+    .quiz-card {
+      padding: clamp(16px, 4vw, 28px);
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .timer-bar-wrap {
+      width: 100%; height: 7px; background: #eee;
+      border-radius: 7px; margin-bottom: clamp(12px, 3vw, 20px); overflow: hidden;
+    }
+    .timer-bar { height: 100%; background: linear-gradient(90deg,#56ccf2,#2f80ed); border-radius: 7px; transition: width .1s linear; }
+
+    .question {
+      font-size: clamp(38px, 11vw, 58px);
+      font-weight: bold; color: #333;
+      letter-spacing: 2px;
+      min-height: clamp(55px, 14vw, 75px);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .answer-input {
+      width: 100%; font-size: clamp(32px, 9vw, 46px); font-weight: bold;
+      text-align: center; border: 3px solid #ddd; border-radius: clamp(12px, 3vw, 18px);
+      padding: 8px; color: #333; outline: none; transition: border-color .2s;
+      margin-bottom: 6px; background: #fafafa; pointer-events: none;
+    }
+    .answer-input.correct { border-color: #27ae60; background: #eafaf1; }
+    .answer-input.wrong   { border-color: #e74c3c; background: #fdf0ed; }
+
+    .feedback {
+      font-size: clamp(16px, 4.5vw, 20px); font-weight: bold;
+      min-height: clamp(24px, 6vw, 30px);
+    }
+    .feedback.correct { color: #27ae60; }
+    .feedback.wrong   { color: #e74c3c; }
+
+    /* ── numpad ── */
+    .numpad {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: clamp(7px, 2vw, 12px); width: 100%; max-width: 520px;
+    }
+    .numpad-btn {
+      padding: clamp(16px, 5vw, 22px);
+      border-radius: clamp(12px, 3vw, 18px);
+      border: none; background: white;
+      font-size: clamp(20px, 6vw, 28px); font-weight: bold; color: #333;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+      transition: transform .1s, box-shadow .1s;
+      touch-action: manipulation;
+      user-select: none;
+    }
+    .numpad-btn:active { transform: scale(0.92); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .numpad-btn.delete { background: #fff3cd; color: #856404; }
+    .numpad-btn.submit {
+      background: linear-gradient(135deg, #56ccf2, #2f80ed); color: white;
+      grid-column: span 2;
+      font-size: clamp(16px, 4.5vw, 20px);
+    }
+
+    /* ===== RESULT SCREEN ===== */
+    #screen-result { flex: 1; width: 100%; max-width: 520px; }
+    .result-scroll {
+      width: 100%; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1; padding: 16px 0;
+    }
+
+    .result-card { padding: clamp(24px, 6vw, 40px) clamp(16px, 5vw, 32px); text-align: center; }
+
+    .result-emoji { font-size: clamp(56px, 15vw, 80px); margin-bottom: 6px; }
+    .result-title { font-size: clamp(24px, 7vw, 34px); font-weight: bold; color: var(--purple); margin-bottom: 4px; }
+    .result-sub   { font-size: clamp(13px, 3.5vw, 16px); color: #888; margin-bottom: 20px; }
+
+    .stars { font-size: clamp(28px, 8vw, 40px); margin-bottom: 16px; }
+
+    .result-score {
+      background: var(--grad); border-radius: clamp(14px, 4vw, 20px);
+      padding: clamp(14px, 4vw, 22px); color: white; margin-bottom: 16px;
+    }
+    .result-score .big   { font-size: clamp(44px, 12vw, 60px); font-weight: bold; }
+    .result-score .label { font-size: clamp(12px, 3vw, 15px); opacity: .85; }
+
+    .result-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: clamp(8px, 2vw, 12px); margin-bottom: 20px; }
+    .stat-box { background: #f5f5f5; border-radius: clamp(10px, 3vw, 16px); padding: clamp(10px, 3vw, 14px) 6px; }
+    .stat-box .sv { font-size: clamp(18px, 5vw, 26px); font-weight: bold; color: #333; }
+    .stat-box .sl { font-size: clamp(10px, 2.5vw, 13px); color: #888; margin-top: 2px; }
+
+    .result-btns { display: flex; flex-direction: column; gap: 10px; }
+    .retry-btn {
+      padding: clamp(14px, 4vw, 18px); border-radius: clamp(14px, 4vw, 22px);
+      border: none;
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+      color: white; font-size: clamp(16px, 4.5vw, 20px); font-weight: bold;
+      cursor: pointer; box-shadow: 0 6px 20px rgba(240,93,251,0.4);
+      touch-action: manipulation;
+    }
+    .retry-btn:active { transform: scale(0.97); }
+    .home-btn {
+      padding: clamp(12px, 3.5vw, 16px); border-radius: clamp(14px, 4vw, 22px);
+      border: 3px solid #ddd; background: white; color: #555;
+      font-size: clamp(14px, 4vw, 17px); font-weight: bold; cursor: pointer;
+      touch-action: manipulation;
+    }
+    .home-btn:active { border-color: var(--purple); color: var(--purple); }
+
+    /* ── confetti / flash ── */
+    .confetti-wrap {
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 999; overflow: hidden;
+    }
+    .confetti-piece {
+      position: absolute; border-radius: 2px;
+      animation: fall linear forwards;
+    }
+    @keyframes fall {
+      0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+    .flash {
+      position: fixed; inset: 0; pointer-events: none; z-index: 998;
+      animation: flash-anim .3s ease forwards;
+    }
+    @keyframes flash-anim {
+      0%   { background: rgba(255,255,255,.5); }
+      100% { background: transparent; }
+    }
+
+    /* ── landscape layout on tablet ── */
+    @media (min-height: 600px) and (orientation: landscape) {
+      #screen-quiz {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .quiz-header, .progress-bar-wrap { flex: 0 0 100%; }
+      .quiz-card { flex: 1 1 55%; margin-bottom: 0; }
+      .numpad    { flex: 1 1 38%; align-content: start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- メニューへ戻るリンク -->
+<a class="menu-back" href="../index.html">← メニュー</a>
+
+<!-- TOP SCREEN -->
+<div id="screen-top" class="screen active">
+  <div class="top-scroll">
+    <div class="card title-card">
+      <div class="title-emoji">🌟</div>
+      <div class="title-text">さんすうチャレンジ！</div>
+      <div class="title-sub">がんばって といてみよう！</div>
+
+      <div class="section-label">🎒 なんねんせい？</div>
+      <div class="grade-btns">
+        <button class="grade-btn" data-grade="1" onclick="selectGrade(1)">
+          <span class="gn">1</span>ねんせい
+        </button>
+        <button class="grade-btn" data-grade="2" onclick="selectGrade(2)">
+          <span class="gn">2</span>ねんせい
+        </button>
+        <button class="grade-btn" data-grade="3" onclick="selectGrade(3)">
+          <span class="gn">3</span>ねんせい
+        </button>
+      </div>
+
+      <div class="section-label">📝 もんだいのしゅるい</div>
+      <div class="mode-btns">
+        <button class="mode-btn" data-mode="add" onclick="selectMode('add')">
+          <span class="mi">➕</span>たしざん
+        </button>
+        <button class="mode-btn" data-mode="sub" onclick="selectMode('sub')">
+          <span class="mi">➖</span>ひきざん
+        </button>
+        <button class="mode-btn" data-mode="mul" onclick="selectMode('mul')">
+          <span class="mi">✖️</span>かけざん
+        </button>
+        <button class="mode-btn" data-mode="mix" onclick="selectMode('mix')">
+          <span class="mi">🎲</span>まぜこぜ
+        </button>
+      </div>
+
+      <button class="start-btn" id="start-btn" onclick="startQuiz()" disabled>
+        スタート！ 🚀
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- QUIZ SCREEN -->
+<div id="screen-quiz" class="screen">
+  <div class="quiz-header">
+    <div class="progress-info" id="progress-info">もんだい 1 / 10</div>
+    <div class="score-badge">⭐ <span id="score-display">0</span></div>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+  </div>
+
+  <div class="card quiz-card">
+    <div class="timer-bar-wrap">
+      <div class="timer-bar" id="timer-bar" style="width:100%"></div>
+    </div>
+    <div class="question" id="question">3 ＋ 5 ＝</div>
+    <input type="text" class="answer-input" id="answer-input"
+      inputmode="none" readonly placeholder="こたえ">
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <div class="numpad">
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(7)">7</button>
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(8)">8</button>
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(9)">9</button>
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(4)">4</button>
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(5)">5</button>
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(6)">6</button>
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(1)">1</button>
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(2)">2</button>
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(3)">3</button>
+    <button class="numpad-btn" ontouchstart="" onclick="numpadPress(0)">0</button>
+    <button class="numpad-btn delete" ontouchstart="" onclick="numpadDelete()">⌫</button>
+    <button class="numpad-btn submit" ontouchstart="" onclick="submitAnswer()">こたえる ✓</button>
+  </div>
+</div>
+
+<!-- RESULT SCREEN -->
+<div id="screen-result" class="screen">
+  <div class="result-scroll">
+    <div class="card result-card">
+      <div class="result-emoji" id="result-emoji">🎉</div>
+      <div class="result-title" id="result-title">すごい！</div>
+      <div class="result-sub" id="result-sub">ぜんぶ できたね！</div>
+      <div class="stars" id="result-stars">⭐⭐⭐</div>
+
+      <div class="result-score">
+        <div class="label">せいかい</div>
+        <div class="big"><span id="result-correct">0</span> / <span id="result-total">10</span></div>
+      </div>
+
+      <div class="result-stats">
+        <div class="stat-box">
+          <div class="sv" id="stat-pct">100%</div>
+          <div class="sl">せいかいりつ</div>
+        </div>
+        <div class="stat-box">
+          <div class="sv" id="stat-time">0びょう</div>
+          <div class="sl">じかん</div>
+        </div>
+        <div class="stat-box">
+          <div class="sv" id="stat-streak">0</div>
+          <div class="sl">さいこう れんぞく</div>
+        </div>
+      </div>
+
+      <div class="result-btns">
+        <button class="retry-btn" onclick="retryQuiz()">もういちど！ 🔄</button>
+        <button class="home-btn" onclick="goHome()">もどる 🏠</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="confetti-wrap" id="confetti-wrap"></div>
+
+<script>
+// ── state ──────────────────────────────────────────
+let selectedGrade = null;
+let selectedMode  = null;
+let questions     = [];
+let current       = 0;
+let score         = 0;
+let correctCount  = 0;
+let streak        = 0;
+let maxStreak     = 0;
+let startTime     = null;
+let timerInterval = null;
+let answered      = false;
+const TOTAL      = 10;
+const TIMER_SECS = 15;
+
+// ── selection ──────────────────────────────────────
+function selectGrade(g) {
+  selectedGrade = g;
+  document.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector(`.grade-btn[data-grade="${g}"]`).classList.add('selected');
+  updateStartBtn();
+}
+
+function selectMode(m) {
+  selectedMode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector(`.mode-btn[data-mode="${m}"]`).classList.add('selected');
+  updateStartBtn();
+}
+
+function updateStartBtn() {
+  document.getElementById('start-btn').disabled = !(selectedGrade && selectedMode);
+}
+
+// ── question generation ────────────────────────────
+function rnd(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+function genQuestion() {
+  const g = selectedGrade;
+  let pool = selectedMode === 'mix'
+    ? (g >= 2 ? ['add','sub','mul'] : ['add','sub'])
+    : [selectedMode];
+  if (g === 1) pool = pool.filter(m => m !== 'mul');
+  if (!pool.length) pool = ['add'];
+
+  const mode = pool[Math.floor(Math.random() * pool.length)];
+  let a, b, sym;
+
+  if (mode === 'add') {
+    if (g === 1)      { a = rnd(1,10);  b = rnd(1, 10 - a); }
+    else if (g === 2) { a = rnd(10,80); b = rnd(10, 100 - a); }
+    else              { a = rnd(100,800); b = rnd(100, 999 - a); }
+    sym = '＋';
+  } else if (mode === 'sub') {
+    if (g === 1)      { a = rnd(2,20);  b = rnd(1, a); }
+    else if (g === 2) { a = rnd(20,100); b = rnd(1, a - 1); }
+    else              { a = rnd(200,999); b = rnd(1, a - 100); }
+    sym = '－';
+  } else {
+    const max = g === 2 ? 5 : 9;
+    a = rnd(2, max); b = rnd(1, 9);
+    sym = '×';
+  }
+
+  const answer = mode === 'add' ? a + b : mode === 'sub' ? a - b : a * b;
+  return { text: `${a} ${sym} ${b} ＝`, answer: String(answer) };
+}
+
+// ── quiz flow ──────────────────────────────────────
+function startQuiz() {
+  questions    = Array.from({length: TOTAL}, genQuestion);
+  current      = 0;
+  score        = 0;
+  correctCount = 0;
+  streak       = 0;
+  maxStreak    = 0;
+  startTime    = Date.now();
+  showScreen('quiz');
+  showQuestion();
+}
+
+function showQuestion() {
+  if (current >= TOTAL) { endQuiz(); return; }
+  const q = questions[current];
+  answered = false;
+
+  document.getElementById('progress-info').textContent = `もんだい ${current + 1} / ${TOTAL}`;
+  document.getElementById('progress-bar').style.width = `${(current / TOTAL) * 100}%`;
+  document.getElementById('score-display').textContent = score;
+  document.getElementById('question').textContent = q.text;
+
+  const inp = document.getElementById('answer-input');
+  inp.value = '';
+  inp.className = 'answer-input';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+
+  startTimer();
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  let remaining = TIMER_SECS * 1000;
+  const bar = document.getElementById('timer-bar');
+  bar.style.background = 'linear-gradient(90deg,#56ccf2,#2f80ed)';
+  bar.style.width = '100%';
+
+  timerInterval = setInterval(() => {
+    remaining -= 100;
+    const pct = Math.max(0, (remaining / (TIMER_SECS * 1000)) * 100);
+    bar.style.width = `${pct}%`;
+    if (pct < 30) bar.style.background = 'linear-gradient(90deg,#f7971e,#f5576c)';
+    if (remaining <= 0) { clearInterval(timerInterval); if (!answered) timeUp(remaining); }
+  }, 100);
+}
+
+function timeUp() {
+  answered = true; streak = 0;
+  const inp = document.getElementById('answer-input');
+  inp.value = '⏰'; inp.className = 'answer-input wrong';
+  const fb = document.getElementById('feedback');
+  fb.textContent = `こたえは ${questions[current].answer} だよ！`;
+  fb.className = 'feedback wrong';
+  setTimeout(nextQuestion, 1800);
+}
+
+// ── numpad ────────────────────────────────────────
+function numpadPress(n) {
+  if (answered) return;
+  const inp = document.getElementById('answer-input');
+  if (inp.value.length < 5) inp.value += n;
+}
+
+function numpadDelete() {
+  if (answered) return;
+  const inp = document.getElementById('answer-input');
+  inp.value = inp.value.slice(0, -1);
+}
+
+function submitAnswer() {
+  if (answered) return;
+  const inp = document.getElementById('answer-input');
+  if (!inp.value) return;
+  clearInterval(timerInterval);
+  answered = true;
+
+  const pctLeft = parseFloat(document.getElementById('timer-bar').style.width) / 100;
+  const correct = inp.value === questions[current].answer;
+  const fb = document.getElementById('feedback');
+
+  if (correct) {
+    inp.className = 'answer-input correct';
+    const bonus = Math.round(pctLeft * 5);
+    const pts = 10 + bonus;
+    score += pts; correctCount++; streak++;
+    maxStreak = Math.max(maxStreak, streak);
+    fb.textContent = streak > 2
+      ? `🔥 ${streak}れんぞく！ ＋${pts}てん`
+      : `⭕ せいかい！ ＋${pts}てん`;
+    fb.className = 'feedback correct';
+    showFlash();
+    launchConfetti(correctCount % 5 === 0 ? 12 : 4);
+  } else {
+    inp.className = 'answer-input wrong';
+    fb.textContent = `❌ こたえは ${questions[current].answer} だよ！`;
+    fb.className = 'feedback wrong';
+    streak = 0;
+  }
+
+  document.getElementById('score-display').textContent = score;
+  setTimeout(nextQuestion, correct ? 1100 : 2000);
+}
+
+function nextQuestion() { current++; showQuestion(); }
+
+// ── result ─────────────────────────────────────────
+function endQuiz() {
+  clearInterval(timerInterval);
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+  const pct = Math.round((correctCount / TOTAL) * 100);
+
+  document.getElementById('progress-bar').style.width = '100%';
+
+  let stars = '', emoji = '💪', title = 'がんばれ！', sub = 'つぎは もっと できるよ！';
+  if (pct >= 90) {
+    stars = '⭐⭐⭐'; emoji = '🏆'; title = 'かんぺき！'; sub = 'ぜんぶ できたね！すごい！';
+    launchConfetti(35);
+  } else if (pct >= 70) {
+    stars = '⭐⭐'; emoji = '🎉'; title = 'すごい！'; sub = 'もうすこしで まんてん！';
+    launchConfetti(18);
+  } else if (pct >= 50) {
+    stars = '⭐'; emoji = '😊'; title = 'よくできました！'; sub = 'またチャレンジしよう！';
+    launchConfetti(6);
+  }
+
+  document.getElementById('result-emoji').textContent   = emoji;
+  document.getElementById('result-title').textContent   = title;
+  document.getElementById('result-sub').textContent     = sub;
+  document.getElementById('result-stars').textContent   = stars;
+  document.getElementById('result-correct').textContent = correctCount;
+  document.getElementById('result-total').textContent   = TOTAL;
+  document.getElementById('stat-pct').textContent       = pct + '%';
+  document.getElementById('stat-time').textContent      = elapsed + 'びょう';
+  document.getElementById('stat-streak').textContent    = maxStreak;
+
+  showScreen('result');
+}
+
+function retryQuiz() { startQuiz(); }
+function goHome()    { showScreen('top'); }
+
+// ── helpers ────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(`screen-${name}`).classList.add('active');
+}
+
+function showFlash() {
+  const f = document.createElement('div');
+  f.className = 'flash';
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 350);
+}
+
+function launchConfetti(count) {
+  const wrap   = document.getElementById('confetti-wrap');
+  const colors = ['#f5576c','#f093fb','#56ccf2','#ffe74c','#27ae60','#e04fc0','#667eea','#ff9a00'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.cssText = `
+      left:${Math.random()*100}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      animation-duration:${1.2 + Math.random()*2}s;
+      animation-delay:${Math.random()*0.5}s;
+      width:${8 + Math.random()*9}px;
+      height:${8 + Math.random()*9}px;
+    `;
+    wrap.appendChild(p);
+    setTimeout(() => p.remove(), 3500);
+  }
+}
+
+// keyboard support (PC でも使えるように)
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('screen-quiz').classList.contains('active')) return;
+  if (answered) return;
+  if (e.key >= '0' && e.key <= '9') numpadPress(+e.key);
+  else if (e.key === 'Backspace') numpadDelete();
+  else if (e.key === 'Enter') submitAnswer();
+});
+
+// prevent pull-to-refresh
+document.body.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+</script>
+</body>
+</html>

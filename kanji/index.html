@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f3460">
+  <title>かんじモンスター図鑑</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', sans-serif;
+    }
+
+    /* ── 全画面ラッパー ── */
+    #app {
+      width: 100%;
+      max-width: 480px;
+      height: 100%;
+      height: -webkit-fill-available;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .screen.active { display: flex; }
+
+    /* ── メニューへ戻るボタン（共通） ── */
+    .menu-back {
+      position: fixed;
+      top: env(safe-area-inset-top, 10px);
+      left: 12px;
+      z-index: 999;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 20px;
+      text-decoration: none;
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* ===================== */
+    /* ホーム画面            */
+    /* ===================== */
+    #screen-home {
+      background: linear-gradient(160deg, #0f3460 0%, #16213e 50%, #1a1a2e 100%);
+    }
+
+    .home-header {
+      padding: env(safe-area-inset-top, 52px) 20px 0;
+      padding-top: max(env(safe-area-inset-top, 0px), 52px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .app-logo {
+      font-size: clamp(16px, 5vw, 20px);
+      font-weight: 900;
+      color: #fff;
+    }
+    .app-logo span { color: #ffd700; }
+    .streak-badge {
+      background: linear-gradient(135deg, #ff6b35, #f7c59f);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: clamp(12px, 3.5vw, 14px);
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .home-hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+      gap: clamp(14px, 4vw, 22px);
+    }
+
+    .hero-monster {
+      width: clamp(140px, 40vw, 180px);
+      height: clamp(140px, 40vw, 180px);
+      position: relative;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-12px); }
+    }
+    .monster-body {
+      width: 80%; height: 80%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 50% 50% 45% 45%;
+      position: absolute;
+      top: 10%; left: 10%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: clamp(48px, 14vw, 72px);
+      box-shadow: 0 10px 30px rgba(102,126,234,0.5);
+    }
+    .monster-shadow {
+      width: 60%; height: 14px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 50%;
+      position: absolute; bottom: 0; left: 50%;
+      transform: translateX(-50%);
+      animation: shadow 3s ease-in-out infinite;
+    }
+    @keyframes shadow {
+      0%,100% { transform: translateX(-50%) scaleX(1); opacity:.3; }
+      50%      { transform: translateX(-50%) scaleX(.8); opacity:.15; }
+    }
+
+    .hero-title { text-align: center; }
+    .hero-title h1 {
+      font-size: clamp(20px, 6vw, 28px);
+      font-weight: 900; color: #fff; line-height: 1.3;
+    }
+    .hero-title h1 span { color: #ffd700; }
+    .hero-title p { color: rgba(255,255,255,.6); font-size: clamp(12px,3.5vw,14px); margin-top:6px; }
+
+    .today-card {
+      width: 100%;
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 16px 18px;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .today-label { font-size:11px; color:rgba(255,255,255,.5); letter-spacing:1px; margin-bottom:10px; }
+    .today-kanjis { display:flex; gap:8px; flex-wrap:wrap; }
+    .kanji-chip {
+      background: rgba(255,255,255,.15); border-radius:12px;
+      width: clamp(44px,13vw,52px); height: clamp(44px,13vw,52px);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      cursor:pointer; transition:all .2s; border: 2px solid transparent;
+    }
+    .kanji-chip.done { border-color:#4ade80; background:rgba(74,222,128,.2); }
+    .kanji-chip .k { font-size: clamp(18px,5.5vw,22px); color:#fff; line-height:1; }
+    .kanji-chip .dot { width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.3);margin-top:3px; }
+    .kanji-chip.done .dot { background:#4ade80; }
+
+    .home-actions {
+      padding: 0 20px 16px;
+      display: flex; gap: 10px;
+    }
+    .btn-primary {
+      flex:1; background:linear-gradient(135deg,#667eea,#764ba2);
+      border:none; border-radius:18px; padding: clamp(14px,4vw,18px);
+      color:#fff; font-size:clamp(15px,4.5vw,17px); font-weight:800;
+      cursor:pointer; box-shadow:0 8px 24px rgba(102,126,234,.4);
+      touch-action:manipulation;
+    }
+    .btn-primary:active { transform:scale(.97); }
+    .btn-secondary {
+      width: clamp(52px,14vw,60px);
+      background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
+      border-radius:18px; color:#fff; font-size:22px;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      touch-action:manipulation;
+    }
+    .btn-secondary:active { transform:scale(.95); }
+
+    /* ボトムナビ */
+    .bottom-nav {
+      height: calc(72px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: rgba(255,255,255,.08);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,.1);
+      display: flex; align-items: flex-start; padding-top: 10px;
+    }
+    .nav-item {
+      flex:1; display:flex; flex-direction:column; align-items:center;
+      gap:3px; cursor:pointer; padding:6px; transition:all .2s;
+    }
+    .nav-item .nav-icon { font-size: clamp(20px,6vw,24px); }
+    .nav-item .nav-label { font-size:clamp(9px,2.5vw,11px); color:rgba(255,255,255,.4); font-weight:600; }
+    .nav-item.active .nav-label { color:#ffd700; }
+    .nav-item.active .nav-icon { filter:drop-shadow(0 0 6px rgba(255,215,0,.8)); }
+
+    /* ===================== */
+    /* かんじ練習画面         */
+    /* ===================== */
+    #screen-practice { background:linear-gradient(160deg,#fff9f0,#fff0e0); }
+
+    .practice-header {
+      padding: max(env(safe-area-inset-top,0px),52px) 16px 12px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .back-btn {
+      width:38px;height:38px; border-radius:50%;
+      background:rgba(0,0,0,.06); border:none;
+      font-size:17px; cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      touch-action:manipulation;
+    }
+    .practice-title { flex:1; font-size:clamp(15px,4.5vw,18px); font-weight:800; color:#333; }
+    .progress-indicator { display:flex; gap:5px; }
+    .prog-dot { width:7px;height:7px;border-radius:50%;background:#ddd; }
+    .prog-dot.active { background:#667eea; }
+    .prog-dot.done   { background:#4ade80; }
+
+    .kanji-stage {
+      flex:1; display:flex; flex-direction:column; align-items:center;
+      padding: 8px 20px; gap:clamp(10px,3vw,16px); overflow-y:auto;
+    }
+
+    .kanji-info-card {
+      width:100%; background:#fff; border-radius:20px;
+      padding:14px 18px; box-shadow:0 4px 20px rgba(0,0,0,.08);
+      display:flex; align-items:center; gap:14px;
+    }
+    .kanji-display {
+      font-size: clamp(48px,14vw,64px);
+      line-height:1; color:#1a1a2e; font-weight:900;
+    }
+    .kanji-meta { flex:1; }
+    .kanji-reading { font-size:clamp(12px,3.2vw,14px); color:#667eea; font-weight:700; margin-bottom:3px; }
+    .kanji-meaning { font-size:clamp(14px,4vw,16px); font-weight:800; color:#333; margin-bottom:5px; }
+    .kanji-grade {
+      font-size:11px; color:#999; background:#f0f0f0;
+      padding:2px 8px; border-radius:10px; display:inline-block;
+    }
+    .audio-btn {
+      width:42px;height:42px; border-radius:50%;
+      background:linear-gradient(135deg,#667eea,#764ba2);
+      border:none; font-size:18px; cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 4px 12px rgba(102,126,234,.4);
+      touch-action:manipulation;
+    }
+
+    .canvas-container {
+      position:relative;
+      width: min(280px, calc(100vw - 48px));
+      height: min(280px, calc(100vw - 48px));
+    }
+    .canvas-bg {
+      position:absolute; inset:0;
+      background:#fff; border-radius:24px;
+      box-shadow:0 8px 30px rgba(0,0,0,.1);
+      border:3px solid #f0e6ff;
+    }
+    .canvas-grid {
+      position:absolute; inset:0;
+      pointer-events:none;
+    }
+    #draw-canvas {
+      position:absolute; inset:0;
+      border-radius:24px; touch-action:none;
+      width:100%; height:100%;
+    }
+    .canvas-hint {
+      position:absolute; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      pointer-events:none;
+    }
+    .hint-char {
+      font-size: clamp(140px,40vw,200px);
+      color:rgba(102,126,234,.06);
+      font-weight:900; line-height:1; user-select:none;
+    }
+
+    .stroke-guide { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center; }
+    .stroke-step {
+      background:#fff; border-radius:12px; padding:7px 12px;
+      font-size:clamp(11px,3vw,13px); font-weight:700; color:#667eea;
+      box-shadow:0 2px 8px rgba(0,0,0,.08);
+      display:flex; align-items:center; gap:5px;
+    }
+    .stroke-num {
+      width:18px;height:18px; border-radius:50%;
+      background:#667eea; color:#fff; font-size:10px;
+      display:flex;align-items:center;justify-content:center; font-weight:800;
+    }
+
+    .practice-actions { width:100%; display:flex; gap:10px; padding-bottom:8px; }
+    .btn-clear {
+      flex: 0 0 48px; height:50px; border-radius:14px;
+      background:#fff; border:2px solid #eee; font-size:18px;
+      cursor:pointer; display:flex;align-items:center;justify-content:center;
+      touch-action:manipulation;
+    }
+    .btn-check {
+      flex:1; height:50px; border-radius:14px;
+      background:linear-gradient(135deg,#667eea,#764ba2);
+      border:none; color:#fff;
+      font-size:clamp(14px,4vw,16px); font-weight:800;
+      cursor:pointer; box-shadow:0 6px 20px rgba(102,126,234,.4);
+      touch-action:manipulation;
+    }
+    .btn-check:active { transform:scale(.97); }
+
+    /* ===================== */
+    /* 正解エフェクト画面     */
+    /* ===================== */
+    #screen-result-k {
+      background: linear-gradient(160deg,#0f3460,#16213e,#1a1a2e);
+    }
+
+    .result-content {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; padding:20px; gap:20px;
+    }
+    .result-badge {
+      font-size:clamp(60px,18vw,80px);
+      animation:popIn .5s cubic-bezier(.175,.885,.32,1.275);
+    }
+    @keyframes popIn {
+      0% { transform:scale(0) rotate(-20deg); }
+      100% { transform:scale(1) rotate(0); }
+    }
+
+    .result-monster-birth {
+      position:relative;
+      width: clamp(180px,50vw,220px);
+      height: clamp(180px,50vw,220px);
+    }
+    .birth-ring {
+      position:absolute; border-radius:50%;
+      border:3px solid rgba(255,215,0,.3);
+      animation:expand 1s ease-out forwards;
+    }
+    @keyframes expand {
+      0%   { transform:translate(-50%,-50%) scale(0); opacity:1; }
+      100% { transform:translate(-50%,-50%) scale(1); opacity:0; }
+    }
+    .birth-ring:nth-child(1) { width:55%;  height:55%;  top:50%;left:50%; animation-delay:0s; }
+    .birth-ring:nth-child(2) { width:75%;  height:75%;  top:50%;left:50%; animation-delay:.2s; }
+    .birth-ring:nth-child(3) { width:100%; height:100%; top:50%;left:50%; animation-delay:.4s; }
+    .new-monster {
+      position:absolute; top:50%;left:50%;
+      transform:translate(-50%,-50%);
+      width:55%;height:55%;
+      background:linear-gradient(135deg,#f093fb,#f5576c);
+      border-radius:50% 50% 45% 45%;
+      display:flex;align-items:center;justify-content:center;
+      font-size: clamp(36px,10vw,52px);
+      box-shadow:0 10px 40px rgba(240,147,251,.5);
+      animation:monsterBorn .6s cubic-bezier(.175,.885,.32,1.275) .3s backwards;
+    }
+    @keyframes monsterBorn {
+      0%   { transform:translate(-50%,-50%) scale(0); }
+      100% { transform:translate(-50%,-50%) scale(1); }
+    }
+
+    .result-text { text-align:center; }
+    .result-text h2 { font-size:clamp(24px,7vw,32px); font-weight:900; color:#ffd700; margin-bottom:6px; }
+    .result-text p  { font-size:clamp(13px,3.5vw,15px); color:rgba(255,255,255,.7); line-height:1.5; }
+    .result-text .monster-name { font-size:clamp(16px,5vw,20px); font-weight:800; color:#f093fb; }
+
+    .particles { position:fixed; inset:0; pointer-events:none; overflow:hidden; }
+    .particle {
+      position:absolute; border-radius:50%;
+      animation:fall 2s ease-in forwards;
+    }
+    @keyframes fall {
+      0%   { transform:translateY(-20px) rotate(0); opacity:1; }
+      100% { transform:translateY(110vh) rotate(720deg); opacity:0; }
+    }
+
+    .result-actions {
+      width:100%; display:flex; flex-direction:column; gap:10px;
+      padding: 0 20px calc(20px + env(safe-area-inset-bottom,0px));
+    }
+    .btn-next {
+      width:100%; padding:clamp(14px,4vw,18px); border-radius:18px;
+      background:linear-gradient(135deg,#ffd700,#ff8c00);
+      border:none; color:#fff;
+      font-size:clamp(16px,4.5vw,18px); font-weight:900;
+      cursor:pointer; box-shadow:0 8px 24px rgba(255,140,0,.4);
+      touch-action:manipulation;
+    }
+    .btn-next:active { transform:scale(.97); }
+    .btn-zukan {
+      width:100%; padding:clamp(12px,3.5vw,16px); border-radius:18px;
+      background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
+      color:#fff; font-size:clamp(14px,4vw,16px); font-weight:700;
+      cursor:pointer; touch-action:manipulation;
+    }
+
+    /* ===================== */
+    /* 図鑑画面              */
+    /* ===================== */
+    #screen-zukan { background:#f8f0ff; }
+
+    .zukan-header {
+      padding: max(env(safe-area-inset-top,0px),52px) 18px 12px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .zukan-title { flex:1; font-size:clamp(17px,5vw,20px); font-weight:900; color:#333; }
+    .zukan-count {
+      font-size:12px; color:#667eea; font-weight:700;
+      background:rgba(102,126,234,.1); padding:3px 10px; border-radius:12px;
+    }
+
+    .zukan-grid {
+      flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
+      padding:0 14px 20px;
+      display:grid; grid-template-columns:repeat(3,1fr); gap:10px; align-content:start;
+    }
+
+    .monster-card {
+      background:#fff; border-radius:18px;
+      padding:clamp(10px,3vw,14px) 8px;
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+      box-shadow:0 4px 16px rgba(0,0,0,.06);
+      cursor:pointer; transition:transform .2s; position:relative;
+    }
+    .monster-card:active { transform:scale(.95); }
+    .monster-card.locked { background:#f5f5f5; box-shadow:none; }
+    .card-monster {
+      width: clamp(54px,15vw,70px);
+      height: clamp(54px,15vw,70px);
+      border-radius:50% 50% 45% 45%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:clamp(26px,8vw,36px);
+    }
+    .monster-card.locked .card-monster { background:#eee!important; color:transparent; text-shadow:0 0 0 #bbb; }
+    .card-kanji { font-size:clamp(18px,5vw,22px); font-weight:900; color:#333; }
+    .monster-card.locked .card-kanji { color:#ccc; }
+    .card-name { font-size:clamp(9px,2.5vw,11px); font-weight:700; color:#667eea; text-align:center; }
+    .monster-card.locked .card-name { color:#ccc; }
+    .lock-icon { position:absolute;top:7px;right:7px;font-size:13px;color:#ccc; }
+    .new-badge-card {
+      position:absolute;top:-4px;right:-4px;
+      background:#f5576c;color:#fff;font-size:9px;font-weight:800;
+      padding:2px 6px;border-radius:8px;
+    }
+
+    /* 保護者ダッシュボード */
+    #screen-parent { background:#f0f4ff; }
+    .parent-header {
+      padding: max(env(safe-area-inset-top,0px),52px) 18px 16px;
+      display:flex;align-items:center;gap:10px;
+    }
+    .parent-title { flex:1; font-size:clamp(17px,5vw,20px); font-weight:900; color:#333; }
+    .parent-content {
+      flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
+      padding:0 18px 20px; display:flex; flex-direction:column; gap:14px;
+    }
+    .stat-cards { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+    .stat-card { background:#fff;border-radius:18px;padding:14px;box-shadow:0 4px 16px rgba(0,0,0,.06); }
+    .stat-card .stat-label { font-size:11px;color:#999;font-weight:600;margin-bottom:5px; }
+    .stat-card .stat-value { font-size:clamp(24px,7vw,32px);font-weight:900;color:#333;line-height:1; }
+    .stat-card .stat-unit  { font-size:13px;color:#999;font-weight:600; }
+    .stat-card .stat-sub   { font-size:11px;color:#4ade80;font-weight:700;margin-top:3px; }
+    .week-chart { background:#fff;border-radius:18px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.06); }
+    .chart-title { font-size:13px;font-weight:800;color:#333;margin-bottom:14px; }
+    .bars { display:flex;align-items:flex-end;gap:6px;height:70px; }
+    .bar-wrap { flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end; }
+    .bar { width:100%;border-radius:5px 5px 0 0;background:linear-gradient(180deg,#667eea,#764ba2);transition:height .6s; }
+    .bar.today { background:linear-gradient(180deg,#ffd700,#ff8c00); }
+    .bar-label { font-size:9px;color:#999;font-weight:600; }
+    .recent-activity { background:#fff;border-radius:18px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.06); }
+    .activity-item { display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f5; }
+    .activity-item:last-child { border-bottom:none; }
+    .activity-icon { width:34px;height:34px;border-radius:10px;background:#f0e6ff;display:flex;align-items:center;justify-content:center;font-size:17px; }
+    .activity-text { flex:1; }
+    .activity-text .act-title { font-size:12px;font-weight:700;color:#333; }
+    .activity-text .act-time  { font-size:10px;color:#999;margin-top:1px; }
+    .activity-score { font-size:13px;font-weight:800;color:#4ade80; }
+
+    ::-webkit-scrollbar { display:none; }
+  </style>
+</head>
+<body>
+
+<!-- メニューへ戻るリンク -->
+<a class="menu-back" href="../index.html">← メニュー</a>
+
+<div id="app">
+
+  <!-- ===== ホーム画面 ===== -->
+  <div id="screen-home" class="screen active">
+    <div class="home-header">
+      <div class="app-logo">かんじ<span>モンスター</span></div>
+      <div class="streak-badge">🔥 7日</div>
+    </div>
+
+    <div class="home-hero">
+      <div class="hero-monster">
+        <div class="monster-body">🐉</div>
+        <div class="monster-shadow"></div>
+      </div>
+      <div class="hero-title">
+        <h1>きょうも<span>かんじ</span>を<br>おぼえよう！</h1>
+        <p>れんぞく 7日め ✨ すごい！</p>
+      </div>
+      <div class="today-card">
+        <div class="today-label">今日のかんじ</div>
+        <div class="today-kanjis">
+          <div class="kanji-chip done" onclick="showPractice('山')"><div class="k">山</div><div class="dot"></div></div>
+          <div class="kanji-chip done" onclick="showPractice('川')"><div class="k">川</div><div class="dot"></div></div>
+          <div class="kanji-chip"      onclick="showPractice('木')"><div class="k">木</div><div class="dot"></div></div>
+          <div class="kanji-chip"      onclick="showPractice('火')"><div class="k">火</div><div class="dot"></div></div>
+          <div class="kanji-chip"      onclick="showPractice('水')"><div class="k">水</div><div class="dot"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="home-actions">
+      <button class="btn-primary" onclick="showPractice('木')">✏️ れんしゅうする</button>
+      <button class="btn-secondary" onclick="showScreen('screen-zukan')">📖</button>
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-item active"><div class="nav-icon">🏠</div><div class="nav-label">ホーム</div></div>
+      <div class="nav-item" onclick="showPractice('木')"><div class="nav-icon">✏️</div><div class="nav-label">れんしゅう</div></div>
+      <div class="nav-item" onclick="showScreen('screen-zukan')"><div class="nav-icon">📖</div><div class="nav-label">ずかん</div></div>
+      <div class="nav-item" onclick="showScreen('screen-parent')"><div class="nav-icon">👨‍👩‍👧</div><div class="nav-label">おやむけ</div></div>
+    </div>
+  </div>
+
+  <!-- ===== かんじ練習画面 ===== -->
+  <div id="screen-practice" class="screen">
+    <div class="practice-header">
+      <button class="back-btn" onclick="showScreen('screen-home')">←</button>
+      <div class="practice-title">かんじをかこう</div>
+      <div class="progress-indicator">
+        <div class="prog-dot done"></div>
+        <div class="prog-dot done"></div>
+        <div class="prog-dot active"></div>
+        <div class="prog-dot"></div>
+        <div class="prog-dot"></div>
+      </div>
+    </div>
+
+    <div class="kanji-stage">
+      <div class="kanji-info-card">
+        <div class="kanji-display" id="practice-kanji">木</div>
+        <div class="kanji-meta">
+          <div class="kanji-reading" id="practice-reading">き / もく</div>
+          <div class="kanji-meaning" id="practice-meaning">き・もり</div>
+          <div class="kanji-grade">1年生のかんじ</div>
+        </div>
+        <button class="audio-btn" onclick="speakKanji()">🔊</button>
+      </div>
+
+      <div class="canvas-container">
+        <div class="canvas-bg"></div>
+        <svg class="canvas-grid" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="50" y1="3" x2="50" y2="97" stroke="#f0e6ff" stroke-width=".8" stroke-dasharray="3"/>
+          <line x1="3" y1="50" x2="97" y2="50" stroke="#f0e6ff" stroke-width=".8" stroke-dasharray="3"/>
+        </svg>
+        <canvas id="draw-canvas"></canvas>
+        <div class="canvas-hint"><div class="hint-char" id="hint-char">木</div></div>
+      </div>
+
+      <div class="stroke-guide" id="stroke-guide"></div>
+
+      <div class="practice-actions">
+        <button class="btn-clear" onclick="clearCanvas()">🗑️</button>
+        <button class="btn-check" onclick="checkAnswer()">✅ できた！</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 正解・モンスター誕生 ===== -->
+  <div id="screen-result-k" class="screen">
+    <div id="particles" class="particles"></div>
+    <div class="result-content">
+      <div class="result-badge">⭐</div>
+      <div class="result-monster-birth">
+        <div class="birth-ring"></div>
+        <div class="birth-ring"></div>
+        <div class="birth-ring"></div>
+        <div class="new-monster" id="result-monster">🌳</div>
+      </div>
+      <div class="result-text">
+        <h2>やったー！✨</h2>
+        <p>あたらしいモンスターが<br>うまれた！</p>
+        <div class="monster-name" id="monster-name">「もりのきき」</div>
+      </div>
+    </div>
+    <div class="result-actions">
+      <button class="btn-next" onclick="nextKanji()">つぎのかんじへ ▶</button>
+      <button class="btn-zukan" onclick="showScreen('screen-zukan')">📖 ずかんをみる</button>
+    </div>
+  </div>
+
+  <!-- ===== ずかん画面 ===== -->
+  <div id="screen-zukan" class="screen">
+    <div class="zukan-header">
+      <button class="back-btn" onclick="showScreen('screen-home')">←</button>
+      <div class="zukan-title">モンスター図鑑</div>
+      <div class="zukan-count">12 / 80</div>
+    </div>
+    <div class="zukan-grid">
+      <div class="monster-card"><div class="new-badge-card">NEW</div><div class="card-monster" style="background:linear-gradient(135deg,#667eea,#764ba2)">🌊</div><div class="card-kanji">水</div><div class="card-name">みずのせいれい</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#f093fb,#f5576c)">🔥</div><div class="card-kanji">火</div><div class="card-name">ほのおのかみさま</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#4facfe,#00f2fe)">🌬️</div><div class="card-kanji">風</div><div class="card-name">かぜのようせい</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#43e97b,#38f9d7)">⛰️</div><div class="card-kanji">山</div><div class="card-name">やまのぬし</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#fa709a,#fee140)">🌙</div><div class="card-kanji">月</div><div class="card-name">つきのひめ</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#ffd700,#ff8c00)">☀️</div><div class="card-kanji">日</div><div class="card-name">たいようのおうじ</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)">🌳</div><div class="card-kanji">木</div><div class="card-name">もりのきき</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#84fab0,#8fd3f4)">🌊</div><div class="card-kanji">川</div><div class="card-name">かわのりゅう</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#d4fc79,#96e6a1)">🌾</div><div class="card-kanji">草</div><div class="card-name">くさぼうず</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#fddb92,#d1fdff)">🌸</div><div class="card-kanji">花</div><div class="card-name">はなのせいけん</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#fccb90,#d57eeb)">🦋</div><div class="card-kanji">虫</div><div class="card-name">むしのようせい</div></div>
+      <div class="monster-card"><div class="card-monster" style="background:linear-gradient(135deg,#89f7fe,#66a6ff)">🐠</div><div class="card-kanji">魚</div><div class="card-name">うみのぬし</div></div>
+      <div class="monster-card locked"><div class="lock-icon">🔒</div><div class="card-monster" style="background:#eee">❓</div><div class="card-kanji">???</div><div class="card-name">みつけていない</div></div>
+      <div class="monster-card locked"><div class="lock-icon">🔒</div><div class="card-monster" style="background:#eee">❓</div><div class="card-kanji">???</div><div class="card-name">みつけていない</div></div>
+      <div class="monster-card locked"><div class="lock-icon">🔒</div><div class="card-monster" style="background:#eee">❓</div><div class="card-kanji">???</div><div class="card-name">みつけていない</div></div>
+    </div>
+    <div class="bottom-nav" style="background:rgba(248,240,255,.9);border-top:1px solid #e8d5ff;">
+      <div class="nav-item" onclick="showScreen('screen-home')"><div class="nav-icon">🏠</div><div class="nav-label" style="color:#999">ホーム</div></div>
+      <div class="nav-item" onclick="showPractice('木')"><div class="nav-icon">✏️</div><div class="nav-label" style="color:#999">れんしゅう</div></div>
+      <div class="nav-item active"><div class="nav-icon">📖</div><div class="nav-label" style="color:#667eea">ずかん</div></div>
+      <div class="nav-item" onclick="showScreen('screen-parent')"><div class="nav-icon">👨‍👩‍👧</div><div class="nav-label" style="color:#999">おやむけ</div></div>
+    </div>
+  </div>
+
+  <!-- ===== 保護者ダッシュボード ===== -->
+  <div id="screen-parent" class="screen">
+    <div class="parent-header">
+      <button class="back-btn" onclick="showScreen('screen-home')">←</button>
+      <div class="parent-title">保護者ページ</div>
+    </div>
+    <div class="parent-content">
+      <div class="stat-cards">
+        <div class="stat-card"><div class="stat-label">今日の学習</div><div class="stat-value">14<span class="stat-unit">分</span></div><div class="stat-sub">↑ 目標達成!</div></div>
+        <div class="stat-card"><div class="stat-label">習得した漢字</div><div class="stat-value">12<span class="stat-unit">字</span></div><div class="stat-sub">↑ 週+5字</div></div>
+        <div class="stat-card"><div class="stat-label">連続日数</div><div class="stat-value">7<span class="stat-unit">日</span></div><div class="stat-sub">🔥 継続中!</div></div>
+        <div class="stat-card"><div class="stat-label">正解率</div><div class="stat-value">88<span class="stat-unit">%</span></div><div class="stat-sub">↑ 先週比+5%</div></div>
+      </div>
+      <div class="week-chart">
+        <div class="chart-title">今週の学習時間（分）</div>
+        <div class="bars">
+          <div class="bar-wrap"><div class="bar" style="height:50%"></div><div class="bar-label">月</div></div>
+          <div class="bar-wrap"><div class="bar" style="height:70%"></div><div class="bar-label">火</div></div>
+          <div class="bar-wrap"><div class="bar" style="height:40%"></div><div class="bar-label">水</div></div>
+          <div class="bar-wrap"><div class="bar" style="height:80%"></div><div class="bar-label">木</div></div>
+          <div class="bar-wrap"><div class="bar" style="height:60%"></div><div class="bar-label">金</div></div>
+          <div class="bar-wrap"><div class="bar" style="height:90%"></div><div class="bar-label">土</div></div>
+          <div class="bar-wrap"><div class="bar today" style="height:45%"></div><div class="bar-label">今日</div></div>
+        </div>
+      </div>
+      <div class="recent-activity">
+        <div class="chart-title">最近の学習</div>
+        <div class="activity-item"><div class="activity-icon">🌊</div><div class="activity-text"><div class="act-title">「水」を習得 → みずのせいれい誕生</div><div class="act-time">今日 9:30</div></div><div class="activity-score">+10⭐</div></div>
+        <div class="activity-item"><div class="activity-icon">🌳</div><div class="activity-text"><div class="act-title">「木」を習得 → もりのきき誕生</div><div class="act-time">今日 9:15</div></div><div class="activity-score">+10⭐</div></div>
+        <div class="activity-item"><div class="activity-icon">📖</div><div class="activity-text"><div class="act-title">復習モード：「山」「川」「火」</div><div class="act-time">昨日 20:05</div></div><div class="activity-score">100%</div></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'screen-practice') initCanvas();
+}
+
+const kanjiData = {
+  '木': { reading:'き / もく', meaning:'き・もり', monster:'🌳', name:'もりのきき',
+           strokes:['たて','よこ','左はらい','右はらい'] },
+  '火': { reading:'ひ / か',   meaning:'ひ・ほのお', monster:'🔥', name:'ほのおのかみさま',
+           strokes:['たて','左はらい','左はらい','右はらい'] },
+  '水': { reading:'みず / すい', meaning:'みず・かわ', monster:'🌊', name:'みずのせいれい',
+           strokes:['たて','左はらい','はね','右はらい'] },
+  '山': { reading:'やま / さん', meaning:'やま・もり', monster:'⛰️', name:'やまのぬし',
+           strokes:['たて','たて','よこ'] },
+  '川': { reading:'かわ / せん', meaning:'かわ・ながれ', monster:'🌊', name:'かわのりゅう',
+           strokes:['たて','たて','たて'] },
+};
+let currentKanji = '木';
+
+function showPractice(kanji) {
+  currentKanji = kanji;
+  const d = kanjiData[kanji] || kanjiData['木'];
+  document.getElementById('practice-kanji').textContent = kanji;
+  document.getElementById('practice-reading').textContent = d.reading;
+  document.getElementById('practice-meaning').textContent = d.meaning;
+  document.getElementById('hint-char').textContent = kanji;
+
+  const guide = document.getElementById('stroke-guide');
+  guide.innerHTML = d.strokes.map((s,i) =>
+    `<div class="stroke-step"><div class="stroke-num">${i+1}</div>${s}</div>`
+  ).join('');
+
+  showScreen('screen-practice');
+}
+
+function speakKanji() {
+  if (!('speechSynthesis' in window)) return;
+  const utt = new SpeechSynthesisUtterance(currentKanji);
+  utt.lang = 'ja-JP'; utt.rate = 0.8;
+  speechSynthesis.speak(utt);
+}
+
+// ── キャンバス ─────────────────────────────────
+let drawing = false, ctx, lastX, lastY;
+
+function initCanvas() {
+  const canvas = document.getElementById('draw-canvas');
+  const container = canvas.parentElement;
+  const size = container.offsetWidth;
+  canvas.width = size; canvas.height = size;
+  canvas.style.width  = size + 'px';
+  canvas.style.height = size + 'px';
+
+  ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, size, size);
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = Math.max(8, size * 0.04);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  canvas.onpointerdown = e => {
+    drawing = true;
+    const r = canvas.getBoundingClientRect();
+    lastX = (e.clientX - r.left) * (size / r.width);
+    lastY = (e.clientY - r.top)  * (size / r.height);
+    canvas.setPointerCapture(e.pointerId);
+  };
+  canvas.onpointermove = e => {
+    if (!drawing) return;
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (size / r.width);
+    const y = (e.clientY - r.top)  * (size / r.height);
+    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.stroke();
+    lastX = x; lastY = y;
+  };
+  canvas.onpointerup = () => { drawing = false; };
+}
+
+function clearCanvas() {
+  if (ctx) {
+    const c = document.getElementById('draw-canvas');
+    ctx.clearRect(0, 0, c.width, c.height);
+  }
+}
+
+function checkAnswer() {
+  const canvas = document.getElementById('draw-canvas');
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const hasDrawing = data.data.some((v, i) => i % 4 === 3 && v > 0);
+  if (!hasDrawing) { alert('かんじをかいてね！'); return; }
+  showResult();
+}
+
+function showResult() {
+  const d = kanjiData[currentKanji] || kanjiData['木'];
+  document.getElementById('result-monster').textContent = d.monster;
+  document.getElementById('monster-name').textContent = `「${d.name}」`;
+  showScreen('screen-result-k');
+  createParticles();
+  if ('speechSynthesis' in window) {
+    setTimeout(() => {
+      const utt = new SpeechSynthesisUtterance('やったー！あたらしいモンスターが生まれた！');
+      utt.lang = 'ja-JP'; utt.rate = 0.9;
+      speechSynthesis.speak(utt);
+    }, 500);
+  }
+}
+
+function createParticles() {
+  const wrap = document.getElementById('particles');
+  wrap.innerHTML = '';
+  const colors = ['#ffd700','#ff6b35','#667eea','#4ade80','#f093fb','#4facfe'];
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.cssText = `
+      left:${Math.random()*100}%;top:${Math.random()*20}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      animation-delay:${Math.random()*.8}s;
+      animation-duration:${1.5+Math.random()}s;
+      width:${6+Math.random()*8}px;height:${6+Math.random()*8}px;
+    `;
+    wrap.appendChild(p);
+  }
+  setTimeout(() => wrap.innerHTML = '', 3000);
+}
+
+function nextKanji() {
+  const keys = Object.keys(kanjiData);
+  const next = keys[(keys.indexOf(currentKanji) + 1) % keys.length];
+  showPractice(next);
+}
+
+document.body.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+</script>
+</body>
+</html>
